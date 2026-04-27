@@ -2338,6 +2338,97 @@ describe("AgentModel", () => {
     });
   });
 
+  describe("ensurePersonalMcpGateway", () => {
+    test("creates a personal mcp_gateway with the expected fields when none exists", async ({
+      makeUser,
+      makeOrganization,
+      makeMember,
+    }) => {
+      const user = await makeUser();
+      const org = await makeOrganization();
+      await makeMember(user.id, org.id);
+
+      const gateway = await AgentModel.ensurePersonalMcpGateway({
+        userId: user.id,
+        organizationId: org.id,
+      });
+
+      expect(gateway.name).toBe("My Gateway");
+      expect(gateway.agentType).toBe("mcp_gateway");
+      expect(gateway.scope).toBe("personal");
+      expect(gateway.isPersonalGateway).toBe(true);
+      expect(gateway.authorId).toBe(user.id);
+      expect(gateway.organizationId).toBe(org.id);
+    });
+
+    test("is idempotent within the same (user, org) - second call returns the same row", async ({
+      makeUser,
+      makeOrganization,
+      makeMember,
+    }) => {
+      const user = await makeUser();
+      const org = await makeOrganization();
+      await makeMember(user.id, org.id);
+
+      const first = await AgentModel.ensurePersonalMcpGateway({
+        userId: user.id,
+        organizationId: org.id,
+      });
+      const second = await AgentModel.ensurePersonalMcpGateway({
+        userId: user.id,
+        organizationId: org.id,
+      });
+
+      expect(first.id).toBe(second.id);
+
+      const allAgents = await AgentModel.findAll(user.id, true);
+      const personalGateways = allAgents.filter(
+        (a) =>
+          a.agentType === "mcp_gateway" &&
+          a.isPersonalGateway === true &&
+          a.authorId === user.id,
+      );
+      expect(personalGateways).toHaveLength(1);
+    });
+  });
+
+  describe("bulkBackfillPersonalMcpGateways", () => {
+    test("creates rows for members who lack a personal gateway and is idempotent on a second call", async ({
+      makeUser,
+      makeOrganization,
+      makeMember,
+    }) => {
+      const org = await makeOrganization();
+      const userA = await makeUser();
+      const userB = await makeUser();
+      await makeMember(userA.id, org.id);
+      await makeMember(userB.id, org.id);
+
+      const firstCount = await AgentModel.bulkBackfillPersonalMcpGateways();
+      expect(firstCount).toBeGreaterThanOrEqual(2);
+
+      const gatewayA = await AgentModel.getPersonalMcpGateway(userA.id, org.id);
+      const gatewayB = await AgentModel.getPersonalMcpGateway(userB.id, org.id);
+      expect(gatewayA?.isPersonalGateway).toBe(true);
+      expect(gatewayB?.isPersonalGateway).toBe(true);
+      expect(gatewayA?.id).not.toBe(gatewayB?.id);
+
+      const secondCount = await AgentModel.bulkBackfillPersonalMcpGateways();
+      expect(secondCount).toBe(0);
+
+      const stillGatewayA = await AgentModel.getPersonalMcpGateway(
+        userA.id,
+        org.id,
+      );
+      const stillGatewayB = await AgentModel.getPersonalMcpGateway(
+        userB.id,
+        org.id,
+      );
+      expect(stillGatewayA?.id).toBe(gatewayA?.id);
+      expect(stillGatewayB?.id).toBe(gatewayB?.id);
+    });
+  });
+
   describe("isAgentDefault / deletion guard", () => {
     test("isAgentDefault returns true for a default agent", async ({
       makeUser,
