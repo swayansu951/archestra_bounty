@@ -176,7 +176,7 @@ export function EnvironmentVariablesFormField<
             })
           }
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4" />
           Add Variable
         </Button>
       </div>
@@ -246,7 +246,7 @@ export function EnvironmentVariablesFormField<
                 envFrom.append({ type: "secret", name: "", prefix: "" })
               }
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4" />
               Add Source
             </Button>
           </div>
@@ -343,7 +343,7 @@ export function EnvironmentVariablesFormField<
               })
             }
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4" />
             Add Secret File
           </Button>
         </div>
